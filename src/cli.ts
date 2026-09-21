@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { createPool, migrate } from "./db.js";
+import { createPool, migrate, rollbackMigration } from "./db.js";
 import { getWorkflow, listWorkflowEvents, listWorkflows } from "./engine/query.js";
 import { runWorker } from "./engine/worker.js";
 import type { WorkflowStatus } from "./types.js";
@@ -9,6 +9,7 @@ const HELP = `stepline — durable, Postgres-backed step-graph workflows
 
 USAGE
   stepline migrate                     apply pending schema migrations
+  stepline rollback <version>          roll back one numbered migration
   stepline worker                      run a worker (polls forever; Ctrl+C to stop)
   stepline list [--status <s>]         list recent workflows
   stepline status <workflow-id>        show one workflow's current state
@@ -31,6 +32,17 @@ async function main(): Promise<void> {
       await migrate(pool);
       console.log("migrated");
       break;
+
+    case "rollback": {
+      const version = Number(rest[0]);
+      if (!Number.isInteger(version)) {
+        console.error("usage: stepline rollback <version>");
+        process.exit(2);
+      }
+      await rollbackMigration(pool, version);
+      console.log(`rolled back ${version}`);
+      break;
+    }
 
     case "worker": {
       await migrate(pool);

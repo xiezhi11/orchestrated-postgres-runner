@@ -44,7 +44,25 @@ export interface WorkflowDef<TInput = unknown> {
   steps: Record<string, StepDef<TInput>>;
 }
 
-export type WorkflowStatus = "running" | "completed" | "failed" | "cancelled";
+export type WorkflowStatus = GraphWorkflowStatus;
+export type GraphWorkflowStatus =
+  | "running"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "paused"
+  | "blocked";
+export type NodeStatus =
+  | "pending"
+  | "ready"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "skipped"
+  | "blocked"
+  | "paused"
+  | "cancelled";
+export type ErrorClass = "retryable" | "permanent" | "paused";
 
 export interface WorkflowRecord<TInput = unknown> {
   id: string;
@@ -62,16 +80,63 @@ export interface WorkflowEvent {
   id: number;
   workflowId: string;
   seq: number;
-  kind:
-    | "started"
-    | "step_scheduled"
-    | "step_completed"
-    | "step_failed"
-    | "timer_scheduled"
-    | "completed"
-    | "failed"
-    | "cancelled";
+  kind: string;
   step: string | null;
   data: Record<string, unknown>;
+  attempt?: number | null;
+  executionId?: string | null;
+  eventKey?: string | null;
+  operator?: string | null;
+  metadata?: Record<string, unknown>;
   createdAt: Date;
+}
+
+export interface RetryConfig {
+  maxAttempts: number;
+  backoffMs: number;
+  backoffFactor: number;
+  maxBackoffMs?: number;
+  jitterMs: number;
+}
+
+export interface DependencyRule {
+  node: string;
+  onSkipped?: "stop" | "continue";
+}
+
+export interface GraphNodeDef<TInput = unknown> {
+  optional?: boolean;
+  dependsOn?: Array<string | DependencyRule>;
+  concurrencyKey?: string;
+  retry?: Partial<RetryConfig>;
+  run?: (ctx: GraphStepContext<TInput>) => Promise<unknown | void>;
+}
+
+export interface GraphDef<TInput = unknown> {
+  id: string;
+  version: number;
+  nodes: Record<string, GraphNodeDef<TInput>>;
+  retry?: Partial<RetryConfig>;
+  concurrency?: number;
+}
+
+export interface SubmitGraphOptions<TInput = unknown> {
+  input: TInput;
+  idempotencyKey?: string;
+  notify?: Array<{ destination: string; eventKinds?: string[] }>;
+}
+
+export interface GraphStepContext<TInput = unknown> {
+  workflowId: string;
+  node: string;
+  attempt: number;
+  executionId: string;
+  input: TInput;
+  inputSummary: unknown;
+  outputs: Record<string, unknown>;
+  signal: AbortSignal;
+}
+
+export interface TimelineEvent extends WorkflowEvent {
+  nodeAttempt?: number | null;
 }

@@ -64,4 +64,5 @@ create table if not exists stepline_schema_meta (
   version int not null
 );
 insert into stepline_schema_meta (version)
-  select 1 where not exists (select 1 from stepline_schema_meta);
+  select 1 where not exists (select 1 from stepline_schema_meta)
+  on conflict do nothing;
